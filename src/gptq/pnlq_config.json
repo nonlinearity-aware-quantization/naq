@@ -1,0 +1,3 @@
+[ 
+    {"awsm_quantization": [{"max_input_value": 4, "sum_exp_threshold": 200.0, "attn_score_threshold": -3.0, "n_bits_act": 4, "combine_threshold": "and"}], "llaf_quantization": [{"input_quantization_type": "fixed_offset", "max_input_value": 4, "threshold": -0.0, "n_bits_act": 4, "n_bits_wgt": 4}], "profiling": "frequency"}
+]
