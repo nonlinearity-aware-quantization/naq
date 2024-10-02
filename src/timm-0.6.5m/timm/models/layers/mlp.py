@@ -3,7 +3,7 @@
 Hacked together by / Copyright 2020 Ross Wightman
 """
 from torch import nn as nn
-import pnlq
+import naq
 
 from .helpers import to_2tuple
 
@@ -11,7 +11,7 @@ from .helpers import to_2tuple
 class Mlp(nn.Module):
     """ MLP as used in Vision Transformer, MLP-Mixer and related networks
     """
-    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, bias=True, drop=0., pnlq_config=None):
+    def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, bias=True, drop=0., naq_config=None):
         super().__init__()
         out_features = out_features or in_features
         hidden_features = hidden_features or in_features
@@ -19,7 +19,7 @@ class Mlp(nn.Module):
         drop_probs = to_2tuple(drop)
 
         self.fc1 = nn.Linear(in_features, hidden_features, bias=bias[0])
-        self.fc1 = pnlq.QuantizedLLAF(in_features, hidden_features, act_fn=act_layer(), config=pnlq_config)
+        self.fc1 = naq.QuantizedLLAF(in_features, hidden_features, act_fn=act_layer(), config=naq_config)
         self.act = act_layer()
         self.drop1 = nn.Dropout(drop_probs[0])
         self.fc2 = nn.Linear(hidden_features, out_features, bias=bias[1])

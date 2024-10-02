@@ -498,9 +498,9 @@ class SwinTransformerV2(nn.Module):
             norm_layer=nn.LayerNorm, ape=False, patch_norm=True,
             pretrained_window_sizes=(0, 0, 0, 0), **kwargs):
         super().__init__()
-        #check kwargs for pnlq_config
-        self.pnlq_config = kwargs.get('pnlq_config', None)
-        print(f"pnlq_config: {self.pnlq_config}")
+        #check kwargs for naq_config
+        self.naq_config = kwargs.get('naq_config', None)
+        print(f"naq_config: {self.naq_config}")
 
         self.num_classes = num_classes
         assert global_pool in ('', 'avg')

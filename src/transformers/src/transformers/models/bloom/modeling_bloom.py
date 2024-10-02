@@ -23,7 +23,7 @@ import torch.utils.checkpoint
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, LayerNorm, MSELoss
 from torch.nn import functional as F
-import pnlq
+import naq
 
 from ...file_utils import add_code_sample_docstrings, add_start_docstrings, add_start_docstrings_to_model_forward
 from ...modeling_outputs import (
@@ -210,7 +210,7 @@ class BloomGelu(nn.Module):
 
 
 class BloomAttention(nn.Module):
-    def __init__(self, config: BloomConfig, pnlq_config: dict = None):
+    def __init__(self, config: BloomConfig, naq_config: dict = None):
         super().__init__()
 
         self.pretraining_tp = config.pretraining_tp
@@ -231,12 +231,12 @@ class BloomAttention(nn.Module):
         # Layer-wise attention scaling
         self.inv_norm_factor = 1.0 / math.sqrt(self.head_dim)
         self.beta = 1.0
-        self.softmax = pnlq.QuantizedAWSM(dim = -1, config = pnlq_config)
+        self.softmax = naq.QuantizedAWSM(dim = -1, config = naq_config)
 
         self.query_key_value = nn.Linear(self.hidden_size, 3 * self.hidden_size, bias=True)
         self.dense = nn.Linear(self.hidden_size, self.hidden_size)
         self.attention_dropout = nn.Dropout(config.attention_dropout)
-        self.pnlq_config = pnlq_config
+        self.naq_config = naq_config
 
     def _split_heads(self, fused_qkv: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
@@ -348,7 +348,7 @@ class BloomAttention(nn.Module):
 
         input_dtype, batch_size, q_length, kv_length, value_layer, present, attn_weights = self.attn_score(hidden_states, alibi, attention_mask, layer_past, use_cache)
 
-        if self.pnlq_config is not None and 'awsm_quantization' in self.pnlq_config:
+        if self.naq_config is not None and 'awsm_quantization' in self.naq_config:
             quantized_hidden_states = self.softmax.quantize_awsm_input(hidden_states) if hidden_states is not None else None
             quantized_alibi = self.softmax.quantize_awsm_input(alibi) if alibi is not None else None
             quantized_layer_past = self.softmax.quantize_awsm_input(layer_past) if layer_past is not None else None
@@ -402,7 +402,7 @@ class BloomMLP(nn.Module):
         self.pretraining_tp = config.pretraining_tp
         self.slow_but_exact = config.slow_but_exact
         self.gelu_impl = BloomGelu()
-        self.dense_h_to_4h = pnlq.QuantizedLLAF(hidden_size, 4 * hidden_size, act_fn = self.gelu_impl, config = config.pnlq_config)
+        self.dense_h_to_4h = naq.QuantizedLLAF(hidden_size, 4 * hidden_size, act_fn = self.gelu_impl, config = config.naq_config)
         self.dense_4h_to_h = nn.Linear(4 * hidden_size, hidden_size)
         self.hidden_dropout = config.hidden_dropout
 
@@ -432,7 +432,7 @@ class BloomBlock(nn.Module):
 
         self.input_layernorm = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
         self.num_heads = config.n_head
-        self.self_attention = BloomAttention(config, config.pnlq_config)
+        self.self_attention = BloomAttention(config, config.naq_config)
         self.post_attention_layernorm = LayerNorm(hidden_size, eps=config.layer_norm_epsilon)
 
         self.mlp = BloomMLP(config)

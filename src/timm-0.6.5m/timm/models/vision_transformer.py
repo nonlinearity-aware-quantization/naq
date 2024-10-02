@@ -37,7 +37,7 @@ from .registry import register_model
 
 _logger = logging.getLogger(__name__)
 
-import pnlq
+import naq
 
 
 def _cfg(url='', **kwargs):
@@ -186,7 +186,7 @@ default_cfgs = {
 
 
 class Attention(nn.Module):
-    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0., pnlq_config=None):
+    def __init__(self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0., naq_config=None):
         super().__init__()
         assert dim % num_heads == 0, 'dim should be divisible by num_heads'
         self.num_heads = num_heads
@@ -197,13 +197,13 @@ class Attention(nn.Module):
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
-        self.softmax = pnlq.QuantizedAWSM(dim=-1, config=pnlq_config)
-        self.pnlq_config = pnlq_config
+        self.softmax = naq.QuantizedAWSM(dim=-1, config=naq_config)
+        self.naq_config = naq_config
 
     def forward(self, x):
         attn, B, N, C, v = self.attn_score(x)
 
-        if self.pnlq_config is not None and 'awsm_quantization' in self.pnlq_config:
+        if self.naq_config is not None and 'awsm_quantization' in self.naq_config:
             quantized_x = self.softmax.quantize_awsm_input(x)
             quantized_attn, _, _, _, _ = self.attn_score(quantized_x)
         else:
@@ -240,16 +240,16 @@ class Block(nn.Module):
 
     def __init__(
             self, dim, num_heads, mlp_ratio=4., qkv_bias=False, drop=0., attn_drop=0., init_values=None,
-            drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, pnlq_config = None):
+            drop_path=0., act_layer=nn.GELU, norm_layer=nn.LayerNorm, naq_config = None):
         super().__init__()
         self.norm1 = norm_layer(dim)
-        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop, pnlq_config=pnlq_config)
+        self.attn = Attention(dim, num_heads=num_heads, qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop, naq_config=naq_config)
         self.ls1 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path1 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
         self.norm2 = norm_layer(dim)
-        self.mlp = Mlp(in_features=dim, hidden_features=int(dim * mlp_ratio), act_layer=act_layer, drop=drop, pnlq_config=pnlq_config)
+        self.mlp = Mlp(in_features=dim, hidden_features=int(dim * mlp_ratio), act_layer=act_layer, drop=drop, naq_config=naq_config)
         self.ls2 = LayerScale(dim, init_values=init_values) if init_values else nn.Identity()
         self.drop_path2 = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
@@ -341,7 +341,7 @@ class VisionTransformer(nn.Module):
             self, img_size=224, patch_size=16, in_chans=3, num_classes=1000, global_pool='token',
             embed_dim=768, depth=12, num_heads=12, mlp_ratio=4., qkv_bias=True, init_values=None,
             class_token=True, no_embed_class=False, fc_norm=None, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.,
-            weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block, pnlq_config=None):
+            weight_init='', embed_layer=PatchEmbed, norm_layer=None, act_layer=None, block_fn=Block, naq_config=None):
         """
         Args:
             img_size (int, tuple): input image size
@@ -392,7 +392,7 @@ class VisionTransformer(nn.Module):
         self.blocks = nn.Sequential(*[
             block_fn(
                 dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, init_values=init_values,
-                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer, act_layer=act_layer, pnlq_config=pnlq_config)
+                drop=drop_rate, attn_drop=attn_drop_rate, drop_path=dpr[i], norm_layer=norm_layer, act_layer=act_layer, naq_config=naq_config)
             for i in range(depth)])
         self.norm = norm_layer(embed_dim) if not use_fc_norm else nn.Identity()
 

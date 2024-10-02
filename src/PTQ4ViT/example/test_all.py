@@ -15,14 +15,14 @@ from utils.quant_calib import HessianQuantCalibrator, QuantCalibrator
 from utils.models import get_net
 import time
 import json
-import pnlq
+import naq
 
-def test_all(name, cfg_modifier=lambda x: x, calib_size=32, config_name="PTQ4ViT", pnlq_config=None):
-    pnlq.clear_tmp_files()
+def test_all(name, cfg_modifier=lambda x: x, calib_size=32, config_name="PTQ4ViT", naq_config=None):
+    naq.clear_tmp_files()
     quant_cfg = init_config(config_name)
     quant_cfg = cfg_modifier(quant_cfg)
 
-    net = get_net(name, pnlq_config)
+    net = get_net(name, naq_config)
 
     wrapped_modules=net_wrap.wrap_modules_in_net(net,quant_cfg)
     
@@ -47,17 +47,17 @@ def test_all(name, cfg_modifier=lambda x: x, calib_size=32, config_name="PTQ4ViT
     print(f"ptqsl_matmul_kwargs: {quant_cfg.ptqsl_matmul_kwargs} \n")
     print(f"calibration time: {(calib_end_time-calib_start_time)/60}min \n")
     print(f"accuracy: {acc} \n\n")
-    model_str = f"{name},{json.dumps(pnlq_config) if pnlq_config != None else 'None'}"
+    model_str = f"{name},{json.dumps(naq_config) if naq_config != None else 'None'}"
     print(model_str)
     with open("results.csv", 'a') as results_file:
         results_file.write(f"{acc:3f},\n")
 
-    if pnlq_config != None:
-        pnlq.process_prediction_stats(model_str,f"{acc:.3f}", write_newline=False)
-        pnlq.process_awsm_stats(model_str, f"{acc:.3f}")
-        pnlq.process_frequency_stats(model_str)
-        pnlq.process_quantization_error_stats(model_str)
-        pnlq.process_macs_stats(model_str)
+    if naq_config != None:
+        naq.process_prediction_stats(model_str,f"{acc:.3f}", write_newline=False)
+        naq.process_awsm_stats(model_str, f"{acc:.3f}")
+        naq.process_frequency_stats(model_str)
+        naq.process_quantization_error_stats(model_str)
+        naq.process_macs_stats(model_str)
 
 class cfg_modifier():
     def __init__(self, **kwargs):
@@ -94,10 +94,10 @@ class cfg_modifier():
 if __name__=='__main__':
     args = parse_args()
 
-    if args.pnlq_config_file is not None:
-        pnlq_configs = pnlq.parse_config(args.pnlq_config_file)
+    if args.naq_config_file is not None:
+        naq_configs = naq.parse_config(args.naq_config_file)
     else:
-        pnlq_configs = [None]
+        naq_configs = [None]
 
     names = [
         # "vit_tiny_patch16_224",
@@ -127,13 +127,13 @@ if __name__=='__main__':
     # config_names = ["PTQ4ViT", "BasePTQ"]
 
     cfg_list = []
-    for name, metric, linear_ptq_setting, calib_size, bit_setting, config_name, pnlq_config in product(names, metrics, linear_ptq_settings, calib_sizes, bit_settings, config_names, pnlq_configs):
+    for name, metric, linear_ptq_setting, calib_size, bit_setting, config_name, naq_config in product(names, metrics, linear_ptq_settings, calib_sizes, bit_settings, config_names, naq_configs):
         cfg_list.append({
             "name": name,
             "cfg_modifier":cfg_modifier(linear_ptq_setting=linear_ptq_setting, metric=metric, bit_setting=bit_setting),
             "calib_size":calib_size,
             "config_name": config_name,
-            "pnlq_config": pnlq_config
+            "naq_config": naq_config
         })
     
     if args.multiprocess:

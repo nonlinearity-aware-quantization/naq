@@ -20,7 +20,7 @@ def attention_forward_attn_score(self, x):
 def attention_forward(self, x):
     attn, B, N, C, q, k, v = self.attn_score(x)
 
-    if self.pnlq_config is not None and 'awsm_quantization' in self.pnlq_config:
+    if self.naq_config is not None and 'awsm_quantization' in self.naq_config:
         quantized_x = self.softmax.quantize_awsm_input(x)
         quantized_attn, _, _, _, _, _, _ = self.attn_score(quantized_x)
     else:
@@ -60,7 +60,7 @@ def window_attention_attn_score(self, x, mask = None):
 def window_attention_forward(self, x, mask = None):
     attn, B_, N, C, v = self.attn_score(x)
 
-    if self.pnlq_config is not None and 'awsm_quantization' in self.pnlq_config:
+    if self.naq_config is not None and 'awsm_quantization' in self.naq_config:
         quantized_x = self.softmax.quantize_awsm_input(x)
         quantized_attn, _, _, _, _ = self.attn_score(quantized_x)
     else:
@@ -80,7 +80,7 @@ class MatMul(nn.Module):
     def forward(self, A, B):
         return A @ B
 
-def get_net(name, pnlq_config = None):
+def get_net(name, naq_config = None):
     """
     Get a vision transformer model.
     This will replace matrix multiplication operations with matmul modules in the model.
@@ -95,7 +95,7 @@ def get_net(name, pnlq_config = None):
     These models are finetuned on imagenet-1k and should use ViTImageNetLoaderGenerator
     for calibration and testing.
     """
-    kwargs = dict(pnlq_config=pnlq_config)
+    kwargs = dict(naq_config=naq_config)
     net = timm.create_model(name, pretrained=True, **kwargs)
 
     for name, module in net.named_modules():

@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument("--n_gpu", type=int, default=1)
     parser.add_argument("--multiprocess", action='store_true')
     parser.add_argument("--name", type=str, required=True)
-    parser.add_argument("--pnlq_config_file", type=str, required=False, help='file with pnlq configuration json')
+    parser.add_argument("--naq_config_file", type=str, required=False, help='file with naq configuration json')
 
     args = parser.parse_args()
     return args

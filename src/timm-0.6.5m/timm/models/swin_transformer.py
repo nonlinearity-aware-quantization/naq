@@ -30,7 +30,7 @@ from .layers import PatchEmbed, Mlp, DropPath, to_2tuple, to_ntuple, trunc_norma
 from .registry import register_model
 from .vision_transformer import checkpoint_filter_fn, get_init_weights_vit
 
-import pnlq
+import naq
 
 
 _logger = logging.getLogger(__name__)
@@ -159,7 +159,7 @@ class WindowAttention(nn.Module):
         proj_drop (float, optional): Dropout ratio of output. Default: 0.0
     """
 
-    def __init__(self, dim, num_heads, head_dim=None, window_size=7, qkv_bias=True, attn_drop=0., proj_drop=0., pnlq_config=None):
+    def __init__(self, dim, num_heads, head_dim=None, window_size=7, qkv_bias=True, attn_drop=0., proj_drop=0., naq_config=None):
 
         super().__init__()
         self.dim = dim
@@ -183,8 +183,8 @@ class WindowAttention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
         trunc_normal_(self.relative_position_bias_table, std=.02)
-        self.softmax = pnlq.QuantizedAWSM(dim=-1, config=pnlq_config)
-        self.pnlq_config = pnlq_config
+        self.softmax = naq.QuantizedAWSM(dim=-1, config=naq_config)
+        self.naq_config = naq_config
 
     def _get_rel_pos_bias(self) -> torch.Tensor:
         relative_position_bias = self.relative_position_bias_table[
@@ -244,7 +244,7 @@ class SwinTransformerBlock(nn.Module):
     def __init__(
             self, dim, input_resolution, num_heads=4, head_dim=None, window_size=7, shift_size=0,
             mlp_ratio=4., qkv_bias=True, drop=0., attn_drop=0., drop_path=0.,
-            act_layer=nn.GELU, norm_layer=nn.LayerNorm, pnlq_config=None):
+            act_layer=nn.GELU, norm_layer=nn.LayerNorm, naq_config=None):
         super().__init__()
         self.dim = dim
         self.input_resolution = input_resolution
@@ -260,11 +260,11 @@ class SwinTransformerBlock(nn.Module):
         self.norm1 = norm_layer(dim)
         self.attn = WindowAttention(
             dim, num_heads=num_heads, head_dim=head_dim, window_size=to_2tuple(self.window_size),
-            qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop, pnlq_config=pnlq_config)
+            qkv_bias=qkv_bias, attn_drop=attn_drop, proj_drop=drop, naq_config=naq_config)
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
-        self.mlp = Mlp(in_features=dim, hidden_features=int(dim * mlp_ratio), act_layer=act_layer, drop=drop, pnlq_config=pnlq_config)
+        self.mlp = Mlp(in_features=dim, hidden_features=int(dim * mlp_ratio), act_layer=act_layer, drop=drop, naq_config=naq_config)
 
         if self.shift_size > 0:
             # calculate attention mask for SW-MSA
@@ -393,7 +393,7 @@ class BasicLayer(nn.Module):
     def __init__(
             self, dim, out_dim, input_resolution, depth, num_heads=4, head_dim=None,
             window_size=7, mlp_ratio=4., qkv_bias=True, drop=0., attn_drop=0.,
-            drop_path=0., norm_layer=nn.LayerNorm, downsample=None, pnlq_config=None):
+            drop_path=0., norm_layer=nn.LayerNorm, downsample=None, naq_config=None):
 
         super().__init__()
         self.dim = dim
@@ -407,7 +407,7 @@ class BasicLayer(nn.Module):
                 dim=dim, input_resolution=input_resolution, num_heads=num_heads, head_dim=head_dim,
                 window_size=window_size, shift_size=0 if (i % 2 == 0) else window_size // 2,
                 mlp_ratio=mlp_ratio, qkv_bias=qkv_bias, drop=drop, attn_drop=attn_drop,
-                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path, norm_layer=norm_layer, pnlq_config=pnlq_config)
+                drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path, norm_layer=norm_layer, naq_config=naq_config)
             for i in range(depth)])
 
         # patch merging layer
@@ -501,7 +501,7 @@ class SwinTransformer(nn.Module):
                 drop_path=dpr[sum(depths[:i]):sum(depths[:i + 1])],
                 norm_layer=norm_layer,
                 downsample=PatchMerging if (i < self.num_layers - 1) else None,
-                pnlq_config=kwargs.get('pnlq_config', None)
+                naq_config=kwargs.get('naq_config', None)
             )]
         self.layers = nn.Sequential(*layers)
 

@@ -9,11 +9,11 @@ from gptq import *
 from modelutils import *
 from quant import *
 import json
-import pnlq
+import naq
 import os
 
 
-def get_bloom(model, pnlq_config):
+def get_bloom(model, naq_config):
     import torch
     def skip(*args, **kwargs):
         pass
@@ -22,7 +22,7 @@ def get_bloom(model, pnlq_config):
     torch.nn.init.normal_ = skip
     from transformers import BloomForCausalLM
     mod_config = transformers.BloomConfig.from_pretrained(model)
-    mod_config.pnlq_config = pnlq_config
+    mod_config.naq_config = naq_config
     model = BloomForCausalLM.from_pretrained(model, torch_dtype='auto', config = mod_config)
     model.seqlen = 2048
     return model
@@ -229,10 +229,10 @@ def bloom_pack3(model, quantizers):
     print('Done.')
     return model
 
-def main_fn(args, pnlq_config):
-    pnlq.clear_tmp_files()
-    pnlq.pause_profiling(pnlq_config)
-    model = get_bloom(args.model, pnlq_config)
+def main_fn(args, naq_config):
+    naq.clear_tmp_files()
+    naq.pause_profiling(naq_config)
+    model = get_bloom(args.model, naq_config)
     model.eval()
 
     dataloader, testloader = get_loaders(
@@ -252,18 +252,18 @@ def main_fn(args, pnlq_config):
             dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
         )
         print(dataset)
-        pnlq.resume_profiling(pnlq_config)
+        naq.resume_profiling(naq_config)
         ppl = bloom_eval(model, testloader, DEV)
 
-        model_str = f"{args.model},{dataset},{json.dumps(pnlq_config) if pnlq_config != None else 'None'}"
+        model_str = f"{args.model},{dataset},{json.dumps(naq_config) if naq_config != None else 'None'}"
         print(model_str)
 
-        if pnlq_config != None:
-            pnlq.process_prediction_stats(model_str,f"{ppl:.2f}", write_newline=False)
-            pnlq.process_awsm_stats(model_str, f"{ppl:.2f}")
-            pnlq.process_frequency_stats(model_str)
-            pnlq.process_quantization_error_stats(model_str)
-            pnlq.process_macs_stats(model_str)
+        if naq_config != None:
+            naq.process_prediction_stats(model_str,f"{ppl:.2f}", write_newline=False)
+            naq.process_awsm_stats(model_str, f"{ppl:.2f}")
+            naq.process_frequency_stats(model_str)
+            naq.process_quantization_error_stats(model_str)
+            naq.process_macs_stats(model_str)
         if os.path.exists("frequency_summary.csv"):
             os.rename("frequency_summary.csv", f"frequency_summary_{dataset}.csv")
 
@@ -321,16 +321,16 @@ if __name__ == '__main__':
         '--new-eval', action='store_true',
         help='Whether to use the new PTB and C4 eval'
     )
-    parser.add_argument("--pnlq_config_file", type=str, required=False, help='file with pnlq configuration json')
+    parser.add_argument("--naq_config_file", type=str, required=False, help='file with naq configuration json')
 
 
     args = parser.parse_args()
 
 
-    if hasattr(args, "pnlq_config_file") and args.pnlq_config_file is not None:
-        pnlq_configs = pnlq.parse_config(args.pnlq_config_file)
+    if hasattr(args, "naq_config_file") and args.naq_config_file is not None:
+        naq_configs = naq.parse_config(args.naq_config_file)
     else:
-        pnlq_configs = [{}]
+        naq_configs = [{}]
 
-    for pnlq_config in pnlq_configs:
-        main_fn(args, pnlq_config)
+    for naq_config in naq_configs:
+        main_fn(args, naq_config)

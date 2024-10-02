@@ -8,7 +8,7 @@ import os
 # from torchprofile import profile_macs
 
 """
-PNLQ Config Expected Structure:
+NAQ Config Expected Structure:
 {
     "llaf_quantization": [
         {
@@ -220,13 +220,13 @@ class QuantizedAWSM(nn.Module):
 
             collect_awsm_stats(attn_score_threshold_mask, sum_exp_threshold_mask, quantized_mask)
 
-            pnlq_output = torch.where(quantized_mask == 1, quantized_input, input)
-            collect_quantization_error_stats(input, pnlq_output, f"awsm_output", dim = self.dim, config = self.config)
-            collect_quantization_error_stats(input, pnlq_output, f"awsm_output_{self.index}", dim = self.dim, config = self.config)
+            naq_output = torch.where(quantized_mask == 1, quantized_input, input)
+            collect_quantization_error_stats(input, naq_output, f"awsm_output", dim = self.dim, config = self.config)
+            collect_quantization_error_stats(input, naq_output, f"awsm_output_{self.index}", dim = self.dim, config = self.config)
         else:
-            pnlq_output = input
+            naq_output = input
 
-        return F.softmax(pnlq_output, dim = self.dim)
+        return F.softmax(naq_output, dim = self.dim)
 
 def collect_prediction_stats(predicted, actual):
     precision = torch.sum(torch.mul(torch.where(predicted == actual, 1, 0), torch.where(predicted == 1, 1, 0))) / torch.sum(torch.where(predicted == 1, 1, 0))
@@ -351,8 +351,8 @@ def clear_tmp_files():
         os.remove("macs.csv")
     
 
-def collect_frequency_stats(tensor: Tensor, tensor_name: str, pnlq_config = None):
-    if pnlq_config is not None and 'profiling' in pnlq_config and "frequency" in pnlq_config["profiling"] and "pause_profiling" not in pnlq_config:
+def collect_frequency_stats(tensor: Tensor, tensor_name: str, naq_config = None):
+    if naq_config is not None and 'profiling' in naq_config and "frequency" in naq_config["profiling"] and "pause_profiling" not in naq_config:
         num_bins = 256
         if tensor_name not in collect_frequency_stats.params:
             tensor_max = math.ceil(tensor.abs().max().item())
@@ -368,12 +368,12 @@ def collect_frequency_stats(tensor: Tensor, tensor_name: str, pnlq_config = None
             stats_file.write(f"{torch.sum(torch.where((tensor >= (num_bins - 1) / scaling - max_value), 1, 0))},")
             stats_file.write("\n")
 
-def pause_profiling(pnlq_config):
-    pnlq_config["pause_profiling"] = True
+def pause_profiling(naq_config):
+    naq_config["pause_profiling"] = True
 
-def resume_profiling(pnlq_config):
-    if "pause_profiling" in pnlq_config:
-        del pnlq_config["pause_profiling"]
+def resume_profiling(naq_config):
+    if "pause_profiling" in naq_config:
+        del naq_config["pause_profiling"]
 
 collect_frequency_stats.params = {}
     
@@ -428,12 +428,12 @@ def process_quantization_error_stats(model_str):
                 for tensor_name in qe_tracker:
                     summary_file.write(f"{model_str},{tensor_name},{qe_tracker[tensor_name]['kl_sum'] / qe_tracker[tensor_name]['total_values']},{qe_tracker[tensor_name]['mse_sum'] / qe_tracker[tensor_name]['total_values']}\n")
 
-def setup_profiling(pnlq_config, model, input):
-    if pnlq_config is not None and 'profiling' in pnlq_config:
-        if "macs" in pnlq_config['profiling']:
+def setup_profiling(naq_config, model, input):
+    if naq_config is not None and 'profiling' in naq_config:
+        if "macs" in naq_config['profiling']:
             with open ("macs.csv", "a") as f:
-                f.write(f"\n{pnlq_config['profiling']}, ")
-            if pnlq_config["profiling"] == "macs_all":
+                f.write(f"\n{naq_config['profiling']}, ")
+            if naq_config["profiling"] == "macs_all":
                 macs = profile_macs(model, input)
                 with open ("macs.csv", "a") as f:
                     f.write(f"{macs}, ")

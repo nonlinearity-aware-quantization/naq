@@ -6,13 +6,13 @@ import torch.nn as nn
 from gptq import *
 from modelutils import *
 from quant import *
-import pnlq
+import naq
 import json
 import transformers
 import os
 
 
-def get_opt(model, pnlq_config):
+def get_opt(model, naq_config):
     import torch
     def skip(*args, **kwargs):
         pass
@@ -21,7 +21,7 @@ def get_opt(model, pnlq_config):
     torch.nn.init.normal_ = skip
     from transformers import OPTForCausalLM
     mod_config = transformers.OPTConfig.from_pretrained(model)
-    mod_config.pnlq_config = pnlq_config
+    mod_config.naq_config = naq_config
     model = OPTForCausalLM.from_pretrained(model, torch_dtype='auto', config = mod_config)
     model.seqlen = model.config.max_position_embeddings
     return model
@@ -127,7 +127,7 @@ def opt_sequential(model, dataloader, dev):
     return quantizers
 
 @torch.no_grad()
-def opt_eval(model, testenc, dev, pnlq_config):
+def opt_eval(model, testenc, dev, naq_config):
     print('Evaluating ...')
 
     testenc = testenc.input_ids
@@ -360,13 +360,13 @@ def benchmark(model, input_ids, check=False):
         if check:
             print('PPL:', torch.exp(tot / (input_ids.numel() - 1)).item())
 
-def main_fn(args, pnlq_config):
-    pnlq.clear_tmp_files()
-    pnlq.pause_profiling(pnlq_config)
+def main_fn(args, naq_config):
+    naq.clear_tmp_files()
+    naq.pause_profiling(naq_config)
     if args.load:
         model = load_quant3(args.model, args.load)
     else:
-        model = get_opt(args.model, pnlq_config)
+        model = get_opt(args.model, naq_config)
         model.eval()
 
     dataloader, testloader = get_loaders(
@@ -398,21 +398,21 @@ def main_fn(args, pnlq_config):
             dataset, seed=args.seed, model=args.model, seqlen=model.seqlen
         )
         print(dataset)
-        pnlq.resume_profiling(pnlq_config)
-        ppl = opt_eval(model, testloader, DEV, pnlq_config)
+        naq.resume_profiling(naq_config)
+        ppl = opt_eval(model, testloader, DEV, naq_config)
 
-        model_str = f"{args.model},{dataset},{json.dumps(pnlq_config) if pnlq_config != None else 'None'}"
+        model_str = f"{args.model},{dataset},{json.dumps(naq_config) if naq_config != None else 'None'}"
         print(model_str)
 
-        if pnlq_config != None:
-            pnlq.process_prediction_stats(model_str,f"{ppl:.2f}", write_newline=False)
-            pnlq.process_awsm_stats(model_str, f"{ppl:.2f}", False)
-            pnlq.process_perturbation_stats(model_str, f"{ppl:.2f}")
-            pnlq.process_frequency_stats(model_str)
-            pnlq.process_quantization_error_stats(model_str)
-            pnlq.process_macs_stats(model_str)
-            pnlq.process_gradient_stats(model_str)
-            pnlq.process_input_gradient_stats(model_str)
+        if naq_config != None:
+            naq.process_prediction_stats(model_str,f"{ppl:.2f}", write_newline=False)
+            naq.process_awsm_stats(model_str, f"{ppl:.2f}", False)
+            naq.process_perturbation_stats(model_str, f"{ppl:.2f}")
+            naq.process_frequency_stats(model_str)
+            naq.process_quantization_error_stats(model_str)
+            naq.process_macs_stats(model_str)
+            naq.process_gradient_stats(model_str)
+            naq.process_input_gradient_stats(model_str)
         if os.path.exists("frequency_summary.csv"):
             os.rename("frequency_summary.csv", f"frequency_summary_{dataset}.csv")
 
@@ -424,7 +424,7 @@ if __name__ == '__main__':
     import argparse
     from datautils import *
 
-    pnlq_configs = [None]
+    naq_configs = [None]
 
     parser = argparse.ArgumentParser()
 
@@ -500,14 +500,14 @@ if __name__ == '__main__':
         '--static-groups', action='store_true',
         help='Whether to use static groups; recommended when using `--actorder` for more efficient inference.'
     )
-    parser.add_argument("--pnlq_config_file", type=str, required=False, help='file with pnlq configuration json')
+    parser.add_argument("--naq_config_file", type=str, required=False, help='file with naq configuration json')
 
     args = parser.parse_args()
 
-    if hasattr(args, "pnlq_config_file") and args.pnlq_config_file is not None:
-        pnlq_configs = pnlq.parse_config(args.pnlq_config_file)
+    if hasattr(args, "naq_config_file") and args.naq_config_file is not None:
+        naq_configs = naq.parse_config(args.naq_config_file)
     else:
-        pnlq_configs = [None]
+        naq_configs = [None]
 
-    for pnlq_config in pnlq_configs:
-        main_fn(args, pnlq_config)
+    for naq_config in naq_configs:
+        main_fn(args, naq_config)

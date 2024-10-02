@@ -36,7 +36,7 @@ from ...utils import (
     replace_return_docstrings,
 )
 from .configuration_opt import OPTConfig
-import pnlq
+import naq
 
 
 logger = logging.get_logger(__name__)
@@ -130,7 +130,7 @@ class OPTAttention(nn.Module):
         dropout: float = 0.0,
         is_decoder: bool = False,
         bias: bool = True,
-        pnlq_config : dict = None
+        naq_config : dict = None
     ):
         super().__init__()
         self.embed_dim = embed_dim
@@ -150,8 +150,8 @@ class OPTAttention(nn.Module):
         self.v_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
         self.q_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.softmax = pnlq.QuantizedAWSM(dim=-1, config=pnlq_config)
-        self.pnlq_config = pnlq_config
+        self.softmax = naq.QuantizedAWSM(dim=-1, config=naq_config)
+        self.naq_config = naq_config
 
     def _shape(self, tensor: torch.Tensor, seq_len: int, bsz: int):
         return tensor.view(bsz, seq_len, self.num_heads, self.head_dim).transpose(1, 2).contiguous()
@@ -240,7 +240,7 @@ class OPTAttention(nn.Module):
 
         bsz, tgt_len, src_len, value_states, attn_weights = self.attn_score(hidden_states, key_value_states, past_key_value, attention_mask)
 
-        if self.pnlq_config is not None and 'awsm_quantization' in self.pnlq_config:
+        if self.naq_config is not None and 'awsm_quantization' in self.naq_config:
             quantized_hidden_states = self.softmax.quantize_awsm_input(hidden_states) if hidden_states is not None else None
             quantized_key_value_states = self.softmax.quantize_awsm_input(key_value_states) if key_value_states is not None else None
             quantized_past_key_value = self.softmax.quantize_awsm_input(past_key_value) if past_key_value is not None else None
@@ -305,13 +305,13 @@ class OPTDecoderLayer(nn.Module):
             dropout=config.attention_dropout,
             is_decoder=True,
             bias=config.enable_bias,
-            pnlq_config = config.pnlq_config
+            naq_config = config.naq_config
         )
         self.do_layer_norm_before = config.do_layer_norm_before
         self.dropout = config.dropout
         self.activation_fn = ACT2FN[config.activation_function]
 
-        self.fc1 = pnlq.QuantizedLLAF(self.embed_dim, config.ffn_dim, bias=config.enable_bias, act_fn = self.activation_fn, config = config.pnlq_config)
+        self.fc1 = naq.QuantizedLLAF(self.embed_dim, config.ffn_dim, bias=config.enable_bias, act_fn = self.activation_fn, config = config.naq_config)
 
         self.self_attn_layer_norm = nn.LayerNorm(
             self.embed_dim, elementwise_affine=config.layer_norm_elementwise_affine
